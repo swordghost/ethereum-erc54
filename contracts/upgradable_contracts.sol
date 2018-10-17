@@ -4,21 +4,21 @@ import './SafeMath.sol';
 
 /**
  * Here is an example of upgradable contract, consisting of three parts:
- *   - Data contract keeps the resources (data) and is controlled by Handlers;
- *   - Handler contract (implements Handler interface) defines operations and provide services. This contract can be upgraded;
- *   - Upgrader contract deals with the voting mechanism and upgrades the Handler contract. The voters are pre-defined by
- *     the contract owner. 
+ *   - Data contract keeps the resources (data) and is controlled by the Handler contract;
+ *   - Handler contract (implements Handler interface) defines operations and provides services. This contract can be upgraded;
+ *   - Upgrader contract (optional) deals with the voting mechanism and upgrades the Handler contract. The voters are pre-defined
+ *     by the contract owner. 
  *
- * @author	Frank.R.Wu (wukd94@pku.edu.cn)
- * @version	0.1.4
+ * @author	Kaidong Wu (wukd94@pku.edu.cn)
+ * @version	0.1.5
  */
 
 /**
- * The example of data contract.
- * There are three parts in the data contract:
- *   - Administrator Data: owner’s address, handler contract’s address and an boolean indicating whether the contract is
+ * The example of Data contract.
+ * There are three parts in the Data contract:
+ *   - Administrator Data: owner’s address, Handler contract’s address and an boolean indicating whether the contract is
  *     initialized or not. 
- *   - Upgrader Data: upgrader contract’s address, upgrade proposal’s submission timestamp and proposal’s time period. 
+ *   - Upgrader Data: Upgrader contract’s address, upgrade proposal’s submission timestamp and proposal’s time period. 
  *   - Resource Data: all other resources that the contract needs to keep and mange.
  */
 contract DataContract {
@@ -26,7 +26,7 @@ contract DataContract {
 	using SafeMath for uint256;
 
 	/** Management data */
-	// Owner and handler contract
+	// Owner and Handler contract
 	address private owner;
 	address private handlerAddr;
 
@@ -40,6 +40,7 @@ contract DataContract {
 	address private upgraderAddr;
 	uint256 private proposalBlockNumber;
 	uint256 private proposalPeriod;
+	/// Upgrading status of the Handler contract
 	enum UpgradingStatus {
 		// Can be upgraded
 		Done,
@@ -49,7 +50,7 @@ contract DataContract {
 		Blocked,
 		// Expired
 		Expired,
-		// Original handler contract error
+		// Original Handler contract error
 		Error
 	}
 
@@ -86,11 +87,11 @@ contract DataContract {
 	/** Modifiers */
 
 	/**
-	 * Check if msg.sender is the handler contract. It is used for setters.
+	 * Check if msg.sender is the Handler contract. It is used for setters.
 	 * If fail, throw PermissionException.
 	 */
 	modifier onlyHandler {
-		require(msg.sender == handlerAddr, "Only handler contract can call this function!");
+		require(msg.sender == handlerAddr, "Only Handler contract can call this function!");
 		_;
 	}
 
@@ -99,7 +100,7 @@ contract DataContract {
 	 * If fail, throw GetterPermissionException.
 	 */
 	modifier allowedAddress {
-		require(addressPermissions[msg.sender], "Don't have the permission!");
+		require(addressPermissions[msg.sender], "Do not have the permission!");
 		_;
 	}
 
@@ -108,20 +109,20 @@ contract DataContract {
 	 * If fail, throw UninitializationException.
 	 */
 	modifier ready {
-		require(valid, "Data contract hasn't been initialized!");
+		require(valid, "Data contract has not been initialized!");
 		_;
 	}
 
 	/** Management functions */
 
 	/**
-	 * Initializer. just the handler contract can call it.
+	 * Initializer. just the Handler contract can call it.
 	 * 
 	 * @param	_str	default value of this.exmStr.
 	 * @param	_int	default value of this.exmInt.
 	 * @param	_array	default value of this.exmArray.
 	 * 
-	 * exception	PermissionException	msg.sender is not the handler contract.
+	 * exception	PermissionException	msg.sender is not the Handler contract.
 	 * exception	ReInitializationException	contract has been initialized.
 	 *
 	 * @return	if the initialization succeeds.
@@ -136,27 +137,27 @@ contract DataContract {
 	}
 
 	/**
-	 * Set handler contract for the contract. Owner must set one to initialize the data contract.
-	 * Handler can be set by owner or upgrader contract.
+	 * Set Handler contract for the contract. Owner must set one to initialize the Data contract.
+	 * Handler can be set by owner or Upgrader contract.
 	 *
-	 * @param	_handlerAddr	address of a deployed handler contract.
-	 * @param	_originalHandlerAddr	address of the original handler contract, only used when an upgrader contract want to set the handler contract.
+	 * @param	_handlerAddr	address of a deployed Handler contract.
+	 * @param	_originalHandlerAddr	address of the original Handler contract, only used when an Upgrader contract want to set the Handler contract.
 	 *
-	 * exception	PermissionException	msg.sender is not the owner nor a registered upgrader contract.
-	 * exception	UpgraderException	upgrader contract does not provide a right address of the original handler contract.
+	 * exception	PermissionException	msg.sender is not the owner nor a registered Upgrader contract.
+	 * exception	UpgraderException	Upgrader contract does not provide a right address of the original Handler contract.
 	 *
-	 * @return	if handler contract is successfully set.
+	 * @return	if Handler contract is successfully set.
 	 */
 	function setHandler (address _handlerAddr, address _originalHandlerAddr) external returns(bool) {
-		// If handler contract can be just upgraded by upgrader contract except the first one, use this requirement.
-		// require((!valid && msg.sender == owner) || msg.sender == upgraderAddr, "Permission error!");
-		// The other version of requirement, owner can always upgrade the handler contract as well.
-		require(msg.sender == owner || msg.sender == upgraderAddr, "Permission error!");
+		// If Handler contract can be just upgraded by Upgrader contract except the first one, use this requirement.
+		require((!valid && msg.sender == owner) || msg.sender == upgraderAddr, "Permission error!");
+		// // The other version of requirement, owner can always upgrade the Handler contract as well.
+		// require(msg.sender == owner || msg.sender == upgraderAddr, "Permission error!");
 
-		// Check if the upgrader contract is right.
-		require(handlerAddr == address(0) || handlerAddr == _originalHandlerAddr, "upgrader contract error!");
+		// Check if the Upgrader contract is right.
+		require(handlerAddr == address(0) || handlerAddr == _originalHandlerAddr, "Upgrader contract error!");
 
-		// Allow handler contract to use getters, and remove original handler contract's permission.
+		// Allow Handler contract to use getters, and remove original Handler contract's permission.
 		addressPermissions[_handlerAddr] = true;
 		if (handlerAddr != address(0)) {
 			addressPermissions[handlerAddr] = false;
@@ -166,21 +167,21 @@ contract DataContract {
 		return true;
 	}
 
-	/** upgrader contract functions */
+	/** Upgrader contract functions */
 
 	/**
-	 * Register an upgrader contract in the contract.
+	 * Register an Upgrader contract in the contract.
 	 * If a proposal has not been accepted until proposalBlockNumber + proposalPeriod, it can be replaced by a new one.
 	 *
-	 * @param	_upgraderAddr	address of a deployed upgrader contract.
+	 * @param	_upgraderAddr	address of a deployed Upgrader contract.
 	 *
 	 * exception	PermissionException	msg.sender is not the owner.
-	 * exception	UpgraderConflictException	Another upgrader contract is working.
+	 * exception	UpgraderConflictException	Another Upgrader contract is working.
 	 *
-	 * @return	if upgrader contract is successfully registed.
+	 * @return	if Upgrader contract is successfully registed.
 	 */
 	function startUpgrading (address _upgraderAddr) public returns(bool) {
-		require(msg.sender == owner, "Just owner can start upgrading handler contract!");
+		require(msg.sender == owner, "Just owner can start upgrading Handler contract!");
 		require(upgraderAddr == address(0) ||
 			proposalBlockNumber.add(proposalPeriod) < block.number,
 			"Another proposal is in the progress!");
@@ -218,13 +219,13 @@ contract DataContract {
 	}
 
 	/**
-	 * Return upgrading status for upgrader contracts.
+	 * Return upgrading status for Upgrader contracts.
 	 *
-	 * @param	_originalHandlerAddr	address of the original handler contract.
+	 * @param	_originalHandlerAddr	address of the original Handler contract.
 	 *
 	 * exception	UninitializationException	uninitialized contract.
 	 *
-	 * @return	handler contract's upgrading status.
+	 * @return	Handler contract's upgrading status.
 	 */
 	function canBeUpgraded (address _originalHandlerAddr) external view ready returns(UpgradingStatus) {
 		if (handlerAddr != _originalHandlerAddr) {
@@ -358,36 +359,36 @@ contract DataContract {
  *   rather than a true interface.
  *
  * Handler is deployed as following steps:
- *   1. Deploy data contract;
- *   2. Deploy a handler contract at a given address specified in the data
+ *   1. Deploy Data contract;
+ *   2. Deploy a Handler contract at a given address specified in the data
  *      contract;
- *   3. Register the handler contract address by calling setHandler() in the
- *      data contract, or use an upgrader contract to switch the handler
- *      contract, which requires that data contract is initialized;
- *   4. Initialize data contract if haven’t done it already.
+ *   3. Register the Handler contract address by calling setHandler() in the
+ *      Data contract, or use an Upgrader contract to switch the handler
+ *      contract, which requires that Data contract is initialized;
+ *   4. Initialize Data contract if haven’t done it already.
  */
 contract IHandler {
 
 	/**
 	 * Initialize the data contarct.
 	 *
-	 * @param	_str	value of exmStr of data contract.
-	 * @param	_int	value of exmInt of data contract.
-	 * @param	_array	value of exmArray of data contract.
+	 * @param	_str	value of exmStr of Data contract.
+	 * @param	_int	value of exmInt of Data contract.
+	 * @param	_array	value of exmArray of Data contract.
 	 */
 	function initialize (string _str, uint256 _int, uint16 [] _array) public;
 
 	/**
-	 * Register upgrader contract address.
+	 * Register Upgrader contract address.
 	 *
-	 * @param	_upgraderAddr	address of the upgrader contract.
+	 * @param	_upgraderAddr	address of the Upgrader contract.
 	 */
 	function prepare2BUpgraded (address _upgraderAddr) external;
 
 	/**
 	 * Upgrader contract calls this to check if it is registered.
 	 *
-	 * @return	if the upgrader contract is registered.
+	 * @return	if the Upgrader contract is registered.
 	 */
 	function isPrepared4Upgrading () external view returns(bool);
 
@@ -397,8 +398,8 @@ contract IHandler {
 	function done() external;
 
 	/**
-	 * Check if the handler contract is a working handler contract.
-	 * It is used to prove the contract is a handler contract.
+	 * Check if the Handler contract is a working Handler contract.
+	 * It is used to prove the contract is a Handler contract.
 	 *
 	 * @return	always true.
 	 */
@@ -417,7 +418,7 @@ contract IHandler {
 }
 
 /**
- * An example implementation of handler contract interface
+ * An example implementation of Handler contract interface
  */
 contract Handler is IHandler {
 
@@ -439,7 +440,7 @@ contract Handler is IHandler {
 	/**
 	 * Constructor.
 	 *
-	 * @param	_dataAddr	address of the data contract.
+	 * @param	_dataAddr	address of the Data contract.
 	 */
 	constructor (address _dataAddr) public {
 		owner = msg.sender;
@@ -450,19 +451,19 @@ contract Handler is IHandler {
 	/**
 	 * Initialize the data contarct.
 	 *
-	 * @param	_str	value of exmStr of data contract.
-	 * @param	_int	value of exmInt of data contract.
-	 * @param	_array	value of exmArray of data contract.
+	 * @param	_str	value of exmStr of Data contract.
+	 * @param	_int	value of exmInt of Data contract.
+	 * @param	_array	value of exmArray of Data contract.
 	 *
 	 * exception	PermissionException	msg.sender is not the owner.
-	 * exception	ReInitializationException	data contract has been initialized.
+	 * exception	ReInitializationException	Data contract has been initialized.
 	 *
 	 * event	Create	service is created.
 	 */
 	function initialize (string _str, uint256 _int, uint16 [] _array) public {
 		require(msg.sender == owner, "Permission error!");
 		require(data.initialize(_str, _int, _array),
-			"Initialization failed! Check if the data contract has been initialized!");
+			"Initialization failed! Check if the Data contract has been initialized!");
 		valid = true;
 		// Example event is used.
 		emit Create(address(this));
@@ -511,18 +512,30 @@ contract Handler is IHandler {
 }
 
 /**
- * Handler upgrader
- * We use abstract contract to define a modifier.
+ * Handler upgrader. The upgrader works in following steps:
+ *   1. Verify the Data contract, its corresponding Handler contract and the new Handler contract have all been deployed;
+ *   2. Deploy an Upgrader contract using Data contract address, previous Handler contract address and new Handler contract 
+ *      address;
+ *   3. Register upgrader address in the new Handler contract first, then the original hander and finally the Data contract;
+ *   4. Call startProposal() to start the voting process;
+ *   5. Call getResolution() before the expiration;
+ *   6. Upgrade succeed or proposal is expired.
+ *    * Function done() can be called at any time to let upgrader destruct itself.
+ *    * Function status() can be called at any time to show caller status of the upgrader.
  */
-contract IUpgrader {
+contract Upgrader {
+
+	using SafeMath for uint256;
+
+	address private owner;
 
 	// Data contract
 	DataContract public data;
-	// Original handler contract
+	// Original Handler contract
 	IHandler public originalHandler;
-	// New handler contract
+	// New Handler contract
 	address public newHandlerAddr;
-	    
+
 	/** Marker */
 	enum UpgraderStatus {
 		Preparing,
@@ -533,109 +546,58 @@ contract IUpgrader {
 	}
 	UpgraderStatus public status;
 
-	/**
-	 * Check if the proposal is expired.
-	 * If so, contract would be marked as expired.
-	 *
-	 * exception    PreparingUpgraderException      proposal has not been started.
-	 * exception    ReupgradingException    upgrading has been done.
-	 * exception    ExpirationException     proposal is expired.
-	 */
-	modifier notExpired {
-	    require(status != UpgraderStatus.Preparing, "Invalid proposal!");
-	    require(status != UpgraderStatus.Success, "Upgrading has been done!");
-	    require(status != UpgraderStatus.Expired, "Proposal is expired!");
-	    if (data.canBeUpgraded(address(originalHandler)) != DataContract.UpgradingStatus.InProgress) {
-			status = UpgraderStatus.Expired;
-			require(false, "Proposal is expired!");
-	    }
-	    _;
-	}
-
-	/**
-	 * Start voting.
-	 * Upgrader must check if data contract and 2 handler contracts are ok.
-	 *
-	 * exception    RestartingException proposal has been already started
-	 * exception	PermissionException	msg.sender is not the owner.
-	 * exception	UpgraderConflictException	another upgrader is working.
-	 * exception	NoPreparationException	original or new handler contract is not prepared.
-	 */
-	function startProposal () external;
-
-	/**
-	 * Anyone can try to get resolution.
-	 * If voters get consensus, upgrade the handler contract.
-	 * If expired, self-destruct.
-	 * Otherwise, do nothing.
-	 *
-	 * exception	PreparingUpgraderException	proposal has not been started.
-	 *
-	 * @return	status of proposal.
-	 * 
-	 * see  IUpgrader.notExpired
-	 */
-	function getResolution() external returns(UpgraderStatus);
-
-	/**
-	 * Destruct itself.
-	 *
-	 * exception	PermissionException	msg.sender is not the owner.
-	 */
-	function done() external;
-}
-
-/**
- * Handler upgrader. The upgrader works in following steps:
- *   1. Verify the data contract, its corresponding handler contract and the new handler contract have all been deployed;
- *   2. Deploy an upgrader contract using data contract address, previous handler contract address and new handler contract 
- *      address;
- *   3. Register upgrader address in the new handler contract first, then the original hander and finally the data contract;
- *   4. Call startProposal() to start the voting process;
- *   5. Call getResolution() before the expiration;
- *   6. Upgrade succeed or proposal is expired.
- *    * Function done() can be called at any time to let upgrader destruct itself.
- *    * Function status() can be called at any time to show caller status of the upgrader.
- */
-contract Upgrader is IUpgrader {
-
-	using SafeMath for uint256;
-
-	address private owner;
-
+	/** Voting mechanism related */
 	uint256 private percentage;
-
 	mapping(address => bool) public voting;
 	mapping(address => bool) private voterRegistered;
 	uint256 private numOfVoters = 0;
 	uint256 private numOfAgreements = 0;
 
 	/**
+	 * Check if the proposal is expired.
+	 * If so, contract would be marked as expired.
+	 *
+	 * exception	PreparingUpgraderException	proposal has not been started.
+	 * exception	ReupgradingException	upgrading has been done.
+	 * exception	ExpirationException	proposal is expired.
+	 */
+	modifier notExpired {
+		require(status != UpgraderStatus.Preparing, "Invalid proposal!");
+		require(status != UpgraderStatus.Success, "Upgrading has been done!");
+		require(status != UpgraderStatus.Expired, "Proposal is expired!");
+		if (data.canBeUpgraded(address(originalHandler)) != DataContract.UpgradingStatus.InProgress) {
+			status = UpgraderStatus.Expired;
+			require(false, "Proposal is expired!");
+		}
+		_;
+	}
+
+	/**
 	 * Constructor.
 	 *
-	 * @param	_dataAddr	address of the data contract.
-	 * @param	_originalAddr	address of the original handler contract.
-	 * @param	_newAddr	address of the new handler contract.
+	 * @param	_dataAddr	address of the Data contract.
+	 * @param	_originalAddr	address of the original Handler contract.
+	 * @param	_newAddr	address of the new Handler contract.
 	 * @param	_voters	addresses of voters.
 	 * @param	_percentage	value of this.percentage.
 	 *
-	 * exception	UninitializationException	_dataAddr does not belong to a deployed data contract having been initialization.
+	 * exception	UninitializationException	_dataAddr does not belong to a deployed Data contract having been initialization.
 	 * exception	UpgraderConflictException	another upgrader is working.
-	 * exception	InvalidHandlerException	_originalAddr or _newAddr doesn't belong to a deployed handler contract.
+	 * exception	InvalidHandlerException	_originalAddr or _newAddr does not belong to a deployed Handler contract.
 	 */
 	constructor (address _dataAddr, address _originalAddr, address _newAddr, address[] _voters, uint256 _percentage) public {
-		// Check if the data contract can be upgarded.
+		// Check if the Data contract can be upgarded.
 		data = DataContract(_dataAddr);
 		require(data.live(),
-			"Can't upgrade handler contract for an uninitialized data contract!");
+			"Can not upgrade Handler contract for an uninitialized Data contract!");
 		require(data.canBeUpgraded(_originalAddr) == DataContract.UpgradingStatus.Done,
-			"Can't upgrade handler contract!");
+			"Can not upgrade Handler contract!");
 
-		// Check if the handler contracts are valid.
+		// Check if the Handler contracts are valid.
 		originalHandler = IHandler(_originalAddr);
-		require(originalHandler.live(), "Invlid original handler contract!");
+		require(originalHandler.live(), "Invlid original Handler contract!");
 		newHandlerAddr = _newAddr;
-		require(IHandler(_newAddr).live(), "Invlid new handler contract!");
+		require(IHandler(_newAddr).live(), "Invlid new Handler contract!");
 
 		owner = msg.sender;
 		_addVoters(_voters);
@@ -647,23 +609,23 @@ contract Upgrader is IUpgrader {
 
 	/**
 	 * Start voting.
-	 * Upgrader must check if data contract and 2 handler contracts are ok.
+	 * Upgrader must check if Data contract and 2 Handler contracts are ok.
 	 *
-	 * exception    RestartingException proposal has been already started
+	 * exception	RestartingException	proposal has been already started.
 	 * exception	PermissionException	msg.sender is not the owner.
 	 * exception	UpgraderConflictException	another upgrader is working.
-	 * exception	NoPreparationException	original or new handler contract is not prepared.
+	 * exception	NoPreparationException	original or new Handler contract is not prepared.
 	 */
 	function startProposal () external {
 	 require(status == UpgraderStatus.Preparing, "Proposal has been already started!");
 		require(msg.sender == owner, "Permission error!");
 		// Check if contracts are prepared.
 		require(data.canBeUpgraded(address(originalHandler)) == DataContract.UpgradingStatus.InProgress,
-			"Haven't registered upgrader in data contract!");
+			"Have not registered upgrader in Data contract!");
 		require(originalHandler.isPrepared4Upgrading(),
-			"Haven't registered upgrader in original handler contract!");
+			"Have not registered upgrader in original Handler contract!");
 		require(IHandler(newHandlerAddr).isPrepared4Upgrading(),
-			"Haven't registered upgrader in new handler contract!");
+			"Have not registered upgrader in new Handler contract!");
 
 		// Mark the contract as voting.
 		status = UpgraderStatus.Voting;
@@ -677,7 +639,7 @@ contract Upgrader is IUpgrader {
 	 *
 	 * exception	PermissionException	msg.sender is not the owner.
 	 * 
-	 * see  IUpgrader.notExpired
+	 * see  this.notExpired
 	 */
 	function addVoters (address[] _voters) public notExpired {
 		require(msg.sender == owner, "Permission error!");
@@ -701,10 +663,10 @@ contract Upgrader is IUpgrader {
 	 *
 	 * exception	PermissionException	msg.sender is not a voter.
 	 * 
-	 * see  IUpgrader.notExpired
+	 * see  this.notExpired
 	 */
 	function vote (bool _choose) external notExpired {
-		require(voterRegistered[msg.sender], "Don't have the permission!");
+		require(voterRegistered[msg.sender], "Do not have the permission!");
 		if (voting[msg.sender] != _choose) {
 			if (_choose) {
 				numOfAgreements++;
@@ -723,7 +685,7 @@ contract Upgrader is IUpgrader {
 	 *
 	 * exception	PermissionException	msg.sender is not the owner.
 	 * 
-	 * see  IUpgrader.notExpired
+	 * see  this.notExpired
 	 */
 	function setPercentage(uint256 _percentage) external notExpired {
 		require(msg.sender == owner, "Permission error!");
@@ -739,7 +701,7 @@ contract Upgrader is IUpgrader {
 
 	/**
 	 * Anyone can try to get resolution.
-	 * If voters get consensus, upgrade the handler contract.
+	 * If voters get consensus, upgrade the Handler contract.
 	 * If expired, self-destruct.
 	 * Otherwise, do nothing.
 	 *
@@ -747,7 +709,7 @@ contract Upgrader is IUpgrader {
 	 *
 	 * @return	status of proposal.
 	 * 
-	 * see  IUpgrader.notExpired
+	 * see  this.notExpired
 	 */
 	function getResolution() external notExpired returns(UpgraderStatus) {
 		if (numOfAgreements > numOfVoters.mul(percentage).div(100)) {
